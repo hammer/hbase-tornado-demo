@@ -1,0 +1,23 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>HBase Tornado Demo</title>
+  </head>
+  <body>
+    <div id="body">
+      <img src="{{ static_url("img/hbase_small.gif") }}" />
+      {% for table in tables %}
+        <h2>{{ table.name }}</h2><br />
+        <h3>Column Families</h3><br />
+        {% for cf in table.column_families %}
+          {{ cf.name }}<br />
+        {% end %}
+        <h3>Regions</h3><br />
+        {% for region in table.regions %}
+          {{ region.name }}<br />
+        {% end %}
+      {% end %}
+    </div>
+  </body>
+</html>

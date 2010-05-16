@@ -1,3 +1,5 @@
+import os
+
 import tornado.httpserver
 import tornado.ioloop
 import tornado.web
@@ -23,19 +25,19 @@ class HBaseTable(object):
   regions = property(lambda self: self.get_regions())
 
 class MainHandler(tornado.web.RequestHandler):
-  # TODO(hammer): Move to a template
   def get(self):
     conn = HBaseConnection('localhost', 9090)
-    for table in [HBaseTable(t) for t in conn.client.getTableNames()]:
-      self.write("Table: %s<br>" % table.name)
-      for cf in table.column_families:
-        self.write("Column Family: %s<br>" % cf.name)
-      for region in table.regions:
-        self.write("Region: %s<br>" % region.name)
+    tables = [HBaseTable(t) for t in conn.client.getTableNames()]
+    self.render("index.html", tables=tables)
+
+settings = {
+  "static_path": os.path.join(os.path.dirname(__file__), "static"),
+  "template_path": os.path.join(os.path.dirname(__file__), "templates"),
+}
 
 application = tornado.web.Application([
-    (r"/", MainHandler),
-])
+  (r"/", MainHandler),
+], **settings)
 
 if __name__ == "__main__":
   http_server = tornado.httpserver.HTTPServer(application)
