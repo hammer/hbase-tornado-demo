@@ -2,11 +2,10 @@ A demonstration of [HBase](http://hbase.org) and [Tornado](http://www.tornadoweb
 
 Adds new features to the chat demo:
 
-(none implemented yet)
+1. Persist chat messages to HBase
 
 Upcoming features:
 
-1. Persist chat messages to HBase.
 1. Bots
 1. Channels
 

@@ -70,6 +70,14 @@ class MessageMixin(object):
     cache = []
     cache_size = 200
 
+    # Read initial cache from HBase
+    hbase_conn = HBaseConnection('localhost', 9090)    
+    old_messages = hbase_conn.scan('message_log', cache_size)
+    for message in old_messages:
+      cache_entry = dict([(entry[u'qualifier'], entry[u'value'])
+                          for entry in message[u'entries']])
+      cache.insert(0, cache_entry)
+
     def wait_for_messages(self, callback, cursor=None):
         cls = MessageMixin
         if cursor:
@@ -95,14 +103,17 @@ class MessageMixin(object):
         cls.cache.extend(messages)
 
         # add to HBase
+        # TODO(hammer): Don't create a new connection every time
+        # TODO(hammer): Would be handy to have MultiPut here
         hbase_conn = HBaseConnection('localhost', 9090)
         for message in messages:
-          hbase_conn.put('message_log', message["timestamp"],
+          hbase_conn.put('message_log', str(99999999999 - int(message["timestamp"])),
                          'messages:id', str(message["id"]),
                          'messages:from', str(message["from"]),
                          'messages:body', str(message["body"]),
                          'messages:html', str(message["html"]))
 
+        # Expire messages off the front of the cache
         if len(cls.cache) > self.cache_size:
             cls.cache = cls.cache[-self.cache_size:]
 
