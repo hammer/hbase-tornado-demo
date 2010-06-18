@@ -91,15 +91,12 @@ var updater = {
     poll: function() {
         var args = {"_xsrf": getCookie("_xsrf")};
         if (updater.cursor) args.cursor = updater.cursor;
-        console.log("POLL args", args);
-        console.log("POLL updater", updater);
         $.ajax({url: "/a/message/updates", type: "POST", dataType: "text",
                 data: $.param(args), success: updater.onSuccess,
                 error: updater.onError});
     },
 
     onSuccess: function(response) {
-        console.log("SUCCESS response", response);
         try {
             updater.newMessages(eval("(" + response + ")"));
         } catch (e) {
