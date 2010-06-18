@@ -22,6 +22,7 @@ import tornado.ioloop
 import tornado.options
 import tornado.web
 import os.path
+import time
 import uuid
 
 from tornado.options import define, options
@@ -92,6 +93,16 @@ class MessageMixin(object):
                 logging.error("Error in waiter callback", exc_info=True)
         cls.waiters = []
         cls.cache.extend(messages)
+
+        # add to HBase
+        hbase_conn = HBaseConnection('localhost', 9090)
+        for message in messages:
+          hbase_conn.put('message_log', message["timestamp"],
+                         'messages:id', str(message["id"]),
+                         'messages:from', str(message["from"]),
+                         'messages:body', str(message["body"]),
+                         'messages:html', str(message["html"]))
+
         if len(cls.cache) > self.cache_size:
             cls.cache = cls.cache[-self.cache_size:]
 
@@ -99,10 +110,12 @@ class MessageMixin(object):
 class MessageNewHandler(BaseHandler, MessageMixin):
     @tornado.web.authenticated
     def post(self):
+        timestamp = ''.join(str(time.time()).split('.'))[:11]
         message = {
             "id": str(uuid.uuid4()),
             "from": self.current_user["first_name"],
             "body": self.get_argument("body"),
+            "timestamp": timestamp,
         }
         message["html"] = self.render_string("message.html", message=message)
         if self.get_argument("next", None):
@@ -121,7 +134,6 @@ class MessageUpdatesHandler(BaseHandler, MessageMixin):
                                cursor=cursor)
 
     def on_new_messages(self, messages):
-        print "NEW MESSAGE"
         # Closed client connection
         if self.request.connection.stream.closed():
             return
