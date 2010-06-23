@@ -45,13 +45,7 @@ function newMessage(form) {
     });
 }
 
-function getCookie(name) {
-    var r = document.cookie.match("\\b" + name + "=([^;]*)\\b");
-    return r ? r[1] : undefined;
-}
-
 jQuery.postJSON = function(url, args, callback) {
-    args._xsrf = getCookie("_xsrf");
     $.ajax({url: url, data: $.param(args), dataType: "text", type: "POST",
             success: function(response) {
         if (callback) callback(eval("(" + response + ")"));
@@ -89,7 +83,7 @@ var updater = {
     cursor: null,
 
     poll: function() {
-        var args = {"_xsrf": getCookie("_xsrf")};
+        var args = {};
         if (updater.cursor) args.cursor = updater.cursor;
         $.ajax({url: "/a/message/updates", type: "POST", dataType: "text",
                 data: $.param(args), success: updater.onSuccess,

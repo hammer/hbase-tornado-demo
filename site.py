@@ -28,9 +28,6 @@ import uuid
 from tornado.options import define, options
 from pyhbase.connection import HBaseConnection
 
-define("port", default=8888, help="run on the given port", type=int)
-
-
 class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
@@ -41,20 +38,16 @@ class Application(tornado.web.Application):
             (r"/a/message/updates", MessageUpdatesHandler),
         ]
         settings = dict(
-            cookie_secret="43oETzKXQAGaYdkL5gEmGeJJFuYh7EQnp2XdTP1o/Vo=",
             login_url="/auth/login",
             template_path=os.path.join(os.path.dirname(__file__), "templates"),
             static_path=os.path.join(os.path.dirname(__file__), "static"),
-            xsrf_cookies=True,
         )
         tornado.web.Application.__init__(self, handlers, **settings)
 
 
 class BaseHandler(tornado.web.RequestHandler):
     def get_current_user(self):
-        user_json = self.get_secure_cookie("user")
-        if not user_json: return None
-        return tornado.escape.json_decode(user_json)
+        return self.get_cookie("user")
 
 
 class MainHandler(BaseHandler):
@@ -124,7 +117,7 @@ class MessageNewHandler(BaseHandler, MessageMixin):
         timestamp = ''.join(str(time.time()).split('.'))[:11]
         message = {
             "id": str(uuid.uuid4()),
-            "from": self.current_user["first_name"],
+            "from": self.current_user,
             "body": self.get_argument("body"),
             "timestamp": timestamp,
         }
@@ -151,18 +144,18 @@ class MessageUpdatesHandler(BaseHandler, MessageMixin):
         self.finish(dict(messages=messages))
 
 
-class AuthLoginHandler(BaseHandler, tornado.auth.GoogleMixin):
-    @tornado.web.asynchronous
+class AuthLoginHandler(BaseHandler):
     def get(self):
-        if self.get_argument("openid.mode", None):
-            self.get_authenticated_user(self.async_callback(self._on_auth))
-            return
-        self.authenticate_redirect(ax_attrs=["name"])
-    
-    def _on_auth(self, user):
-        if not user:
-            raise tornado.web.HTTPError(500, "Google auth failed")
-        self.set_secure_cookie("user", tornado.escape.json_encode(user))
+        self.write("""\
+        <html>
+         <body>
+          <form action="/auth/login" method="post">
+           Name: <input type="text" name="name">
+           <input type="submit" value="Sign in">
+          </form></body></html>""")
+
+    def post(self):
+        self.set_cookie("user", self.get_argument("name"))
         self.redirect("/")
 
 
@@ -175,7 +168,7 @@ class AuthLogoutHandler(BaseHandler):
 def main():
     tornado.options.parse_command_line()
     http_server = tornado.httpserver.HTTPServer(Application())
-    http_server.listen(options.port)
+    http_server.listen(8888)
     tornado.ioloop.IOLoop.instance().start()
 
 
