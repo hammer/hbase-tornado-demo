@@ -26,7 +26,10 @@ import time
 import uuid
 
 from tornado.options import define, options
-from pyhbase.connection import HBaseConnection
+
+# Conditionally enable HBase
+hbase_enabled = False
+if hbase_enabled: from pyhbase.connection import HBaseConnection
 
 class Application(tornado.web.Application):
     def __init__(self):
@@ -53,9 +56,7 @@ class BaseHandler(tornado.web.RequestHandler):
 class MainHandler(BaseHandler):
     @tornado.web.authenticated
     def get(self):
-        hbase_conn = HBaseConnection('localhost', 9090)
-        hbase_version = hbase_conn.get_hbase_version()
-        self.render("index.html", messages=MessageMixin.cache, hbase_version=hbase_version)
+        self.render("index.html", messages=MessageMixin.cache)
 
 
 class MessageMixin(object):
@@ -64,12 +65,25 @@ class MessageMixin(object):
     cache_size = 200
 
     # Read initial cache from HBase
-    hbase_conn = HBaseConnection('localhost', 9090)    
-    old_messages = hbase_conn.scan('message_log', cache_size)
-    for message in old_messages:
-      cache_entry = dict([(entry[u'qualifier'], entry[u'value'])
-                          for entry in message[u'entries']])
-      cache.insert(0, cache_entry)
+    if hbase_enabled:
+        hbase_conn = HBaseConnection('localhost', 9090)    
+        old_messages = hbase_conn.scan('message_log', cache_size)
+        for message in old_messages:
+            cache_entry = dict([(entry[u'qualifier'], entry[u'value'])
+                                for entry in message[u'entries']])
+            cache.insert(0, cache_entry)
+
+    # TODO(hammer): Don't create a new connection every time
+    # TODO(hammer): Would be handy to have MultiPut here
+    @staticmethod
+    def record_messages(messages):
+        hbase_conn = HBaseConnection('localhost', 9090)
+        for message in messages:
+            hbase_conn.put('message_log', str(99999999999 - int(message["timestamp"])),
+                           'messages:id', str(message["id"]),
+                           'messages:from', str(message["from"]),
+                           'messages:body', str(message["body"]),
+                           'messages:html', str(message["html"]))
 
     def wait_for_messages(self, callback, cursor=None):
         cls = MessageMixin
@@ -96,15 +110,7 @@ class MessageMixin(object):
         cls.cache.extend(messages)
 
         # add to HBase
-        # TODO(hammer): Don't create a new connection every time
-        # TODO(hammer): Would be handy to have MultiPut here
-        hbase_conn = HBaseConnection('localhost', 9090)
-        for message in messages:
-          hbase_conn.put('message_log', str(99999999999 - int(message["timestamp"])),
-                         'messages:id', str(message["id"]),
-                         'messages:from', str(message["from"]),
-                         'messages:body', str(message["body"]),
-                         'messages:html', str(message["html"]))
+        if hbase_enabled: cls.record_messages(messages)
 
         # Expire messages off the front of the cache
         if len(cls.cache) > self.cache_size:
